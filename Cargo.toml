@@ -1,0 +1,23 @@
+[package]
+name = "locked-object-store"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1"
+sqlx = {version = "^0.6.3", default-features = false }
+async-trait = "0.1.68"
+serde = "1"
+serde_json = "1"
+
+[features]
+default = ["postgres", "tokio-rustls"]
+postgres = ["sqlx/postgres"]
+tokio-native-tls = ["sqlx/runtime-tokio-native-tls"]
+tokio-rustls = ["sqlx/runtime-tokio-rustls"]
+actix-native-tls = ["sqlx/runtime-actix-native-tls"]
+actix-rustls = ["sqlx/runtime-actix-rustls"]
+async-std-native-tls = ["sqlx/runtime-async-std-native-tls"]
+async-std-rustls = ["sqlx/runtime-async-std-rustls"]
