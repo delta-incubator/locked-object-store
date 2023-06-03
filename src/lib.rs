@@ -4,11 +4,10 @@ mod errors;
 #[cfg(feature = "postgres")]
 pub mod postgres;
 
-use std::fmt::Debug;
-
 use crate::errors::LockedObjectStoreError;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 /// A lock that has been successfully acquired
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -69,4 +68,4 @@ pub trait LockClient: Send + Sync + Debug {
     ) -> Result<bool, LockedObjectStoreError>;
 }
 
-pub const DEFAULT_MAX_RETRY_ACQUIRE_LOCK_ATTEMPTS: u32 = 10_000;
+pub const DEFAULT_MAX_RETRY_ACQUIRE_LOCK_ATTEMPTS: u32 = 100;
