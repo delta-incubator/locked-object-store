@@ -35,7 +35,7 @@ pub struct PgLockItem {
     /// The name of the owner that owns this lock.
     pub owner_name: String,
     /// Current version number of the lock in Postgres.
-    pub record_version_number: uuid::Uuid,
+    pub record_version_number: Uuid,
     /// The amount of time (in seconds) that the owner has this lock for.
     /// If lease_duration is None then the lock is non-expirable.
     pub lease_duration: Option<i64>,
