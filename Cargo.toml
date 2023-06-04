@@ -7,14 +7,19 @@ edition = "2021"
 
 [dependencies]
 thiserror = "1"
-sqlx = {version = "^0.6.3", default-features = false }
+sqlx = {version = "^0.6.3", default-features = false, optional = true}
 async-trait = "0.1.68"
 serde = "1"
 serde_json = "1"
+chrono = {version = "^0.4.26", optional = true, features = ['serde']}
+uuid = {version = "^1.3.3", features = ["v4","fast-rng", "macro-diagnostics", "serde"], optional = true}
+
+[dev-dependencies]
+tokio = {version = "^1.28.2", features = ["full"]}
 
 [features]
 default = ["postgres", "tokio-rustls"]
-postgres = ["sqlx/postgres"]
+postgres = ["sqlx/postgres", "sqlx/uuid", "sqlx/chrono", "sqlx/migrate", "sqlx/macros", "sqlx", "chrono", "uuid"]
 tokio-native-tls = ["sqlx/runtime-tokio-native-tls"]
 tokio-rustls = ["sqlx/runtime-tokio-rustls"]
 actix-native-tls = ["sqlx/runtime-actix-native-tls"]

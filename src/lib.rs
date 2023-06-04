@@ -34,11 +34,10 @@ pub struct LockItem<T> {
 
 /// Abstraction over a distributive lock provider
 #[async_trait]
-pub trait LockClient: Send + Sync + Debug {
+pub trait LockClient: Send + Sync {
     /// Attempts to acquire lock for data. If successful, returns the lock.
     /// Otherwise returns [`Option::None`] which is retryable action.
-    /// Visit implementation docs for more details.
-    async fn try_acquire_lock<T: Serialize + Send>(
+    async fn try_acquire_lock<T: Serialize + Send + Copy>(
         &self,
         data: T,
     ) -> Result<Option<LockItem<T>>, LockedObjectStoreError>;

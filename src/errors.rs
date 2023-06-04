@@ -4,7 +4,7 @@ use thiserror::Error;
 pub enum LockedObjectStoreError {
     /// Error returned by `acquire_lock` which indicates that the lock could
     /// not be acquired for more that returned number of seconds.
-    #[error("Could not acquire lock for {0} sec")]
+    #[error("could not acquire lock for {0} sec")]
     TimedOut(u64),
 
     /// Error returned which indicates that the lock could
@@ -17,6 +17,20 @@ pub enum LockedObjectStoreError {
     /// whenever the lock is available, because it effectively locks the rename operation. However
     /// if the `is_non_acquirable` is set, then the `NonAcquirableLock` is returned which prohibits
     /// the delta-rs to continue the write.
-    #[error("The existing lock is non-acquirable")]
+    #[error("the existing lock is non-acquirable")]
     NonAcquirableLock,
+    #[error("underlying sqlx/postgres error: {0}")]
+    Sqlx(#[from] sqlx::Error),
+    #[error("database migration error: {0}")]
+    Migration(#[from] sqlx::migrate::MigrateError),
+}
+
+#[derive(Error, Debug)]
+pub enum TestError {
+    #[error("required environment variable missing {0}")]
+    RequiredEnvVar(String),
+    #[error("unwrap option error: {0}")]
+    UnwrapOption(String),
+    #[error("underlying functionality error: {0}")]
+    LockedObjectStore(#[from] LockedObjectStoreError),
 }
