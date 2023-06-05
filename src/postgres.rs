@@ -3,8 +3,8 @@ use crate::{LockClient, LockItem};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
-use sqlx::{FromRow, PgPool, Pool, Postgres};
-use std::ops::Add;
+use sqlx::{Executor, FromRow, PgPool, Pool, Postgres};
+use std::ops::{Add, Deref};
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -158,7 +158,7 @@ impl LockClient for PostgresLockClient {
             let lock: PgLockItem = sqlx::query_as(
                 r#"
             UPDATE locked_object_store.locks 
-            SET record_version_number = $1, lease_duration = $2, lookup_time = CLOCK_TIMESTAMP()
+            SET record_version_number = $1, lease_duration = $2, lookup_time = CLOCK_TIMESTAMP(), is_released = false
             WHERE data = $3 and record_version_number = $4::uuid
             RETURNING *;
             "#,
@@ -184,25 +184,78 @@ impl LockClient for PostgresLockClient {
         }
     }
 
-    async fn get_lock<T: Serialize + Send>(
+    async fn get_lock<T: Serialize + Send + Copy>(
         &self,
         data: T,
     ) -> Result<Option<LockItem<T>>, LockedObjectStoreError> {
-        todo!()
+        let lock: Option<PgLockItem> = sqlx::query_as(
+            r#"
+        SELECT record_version_number,owner_name,lease_duration,is_released,lookup_time,is_non_acquirable 
+        FROM locked_object_store.locks 
+        WHERE data = $1 
+        FOR UPDATE
+        LIMIT 1
+        "#,
+        )
+            .bind(Json(data))
+            .fetch_optional(&self.db)
+            .await?;
+
+        match lock {
+            None => Err(LockedObjectStoreError::NotExists),
+            Some(l) => {
+                let mut lock = LockItem::from(l);
+                lock.data = Some(data);
+                Ok(Some(lock))
+            }
+        }
     }
 
-    async fn update_data<T: Serialize>(
+    async fn update_data<T: Serialize + Sync + Send + Copy>(
         &self,
         lock: &LockItem<T>,
     ) -> Result<LockItem<T>, LockedObjectStoreError> {
         todo!()
     }
 
-    async fn release_lock<T: Serialize>(
+    async fn release_lock<T: Serialize + Sync + Send + Copy>(
         &self,
         lock: &LockItem<T>,
     ) -> Result<bool, LockedObjectStoreError> {
-        todo!()
+        // we wrap this all in a transaction so that the SELECT FOR UPDATE doesn't block our own
+        // updates if the lock exists and we can acquire it - we don't need the actual lock here
+        // just the row lock FOR UPDATE gives us
+        let mut transaction = self.db.begin().await?;
+        sqlx::query(
+            r#"
+        SELECT record_version_number,owner_name,lease_duration,is_released,lookup_time,is_non_acquirable 
+        FROM locked_object_store.locks 
+        WHERE data = $1
+        AND record_version_number = $2::uuid
+        FOR UPDATE
+        LIMIT 1
+        "#,
+        )
+            .bind(Json(lock.data))
+            .bind(lock.record_version_number.clone())
+            .fetch_optional(&mut transaction)
+            .await?;
+
+        transaction
+            .execute(
+                sqlx::query(
+                    r#"
+        UPDATE locked_object_store.locks SET is_released = true 
+        WHERE record_version_number = $1::uuid AND data = $2
+        "#,
+                )
+                .bind(lock.record_version_number.clone())
+                .bind(Json(lock.data)),
+            )
+            .await?;
+
+        transaction.commit().await?;
+        Ok(true)
     }
 }
 
@@ -228,7 +281,7 @@ mod tests {
             db_connection_string,
             PostgresOptions {
                 owner_name: "test suite".to_string(),
-                lease_duration: 10000, // long lease duration so our test suite can check locks
+                lease_duration: 10, // long lease duration so our test suite can check locks
                 refresh_period: Duration::from_secs(1),
                 additional_time_to_wait_for_lock: Duration::from_millis(200),
             },
@@ -238,18 +291,56 @@ mod tests {
         let lock = lock_client
             .try_acquire_lock(TestData { id: 0 })
             .await?
-            .ok_or(TestError::UnwrapOption("lock return".to_string()))?;
+            .ok_or(TestError::UnwrapOption("initial lock return".to_string()))?;
 
         assert!(lock.lease_duration.is_some());
         // just a sanity check that our lease matches our options
-        assert_eq!(lock.lease_duration.unwrap(), 10000);
+        assert_eq!(lock.lease_duration.unwrap(), 10);
         assert!(!lock.is_non_acquirable);
         assert!(!lock.acquired_expired_lock);
 
         // we should not be able to acquire the the lock immediately after locking and before release
-        let lock = lock_client.try_acquire_lock(TestData { id: 0 }).await?;
-        assert!(lock.is_none());
+        let lock2 = lock_client.try_acquire_lock(TestData { id: 0 }).await?;
+        assert!(lock2.is_none());
 
+        let result = lock_client.release_lock(&lock).await?;
+        assert!(result);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get() -> Result<(), TestError> {
+        let db_connection_string = option_env!("DATABASE_URL")
+            .ok_or(TestError::RequiredEnvVar("DATABASE_URL".to_string()))?;
+
+        let lock_client = PostgresLockClient::new(
+            db_connection_string,
+            PostgresOptions {
+                owner_name: "test suite".to_string(),
+                lease_duration: 10, // long lease duration so our test suite can check locks
+                refresh_period: Duration::from_secs(1),
+                additional_time_to_wait_for_lock: Duration::from_millis(200),
+            },
+        )
+        .await?;
+
+        lock_client
+            .try_acquire_lock(TestData { id: 1 })
+            .await?
+            .ok_or(TestError::UnwrapOption("lock return".to_string()))?;
+
+        let lock = lock_client.get_lock(TestData { id: 1 }).await?;
+
+        assert!(lock.is_some());
+        let lock = lock.unwrap();
+        assert!(lock.lease_duration.is_some());
+        // just a sanity check that our lease matches our options
+        assert_eq!(lock.lease_duration.unwrap(), 10);
+        assert!(!lock.is_non_acquirable);
+        assert!(!lock.acquired_expired_lock);
+
+        let result = lock_client.release_lock(&lock).await?;
+        assert!(result);
         Ok(())
     }
 }

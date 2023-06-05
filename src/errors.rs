@@ -19,10 +19,14 @@ pub enum LockedObjectStoreError {
     /// the delta-rs to continue the write.
     #[error("the existing lock is non-acquirable")]
     NonAcquirableLock,
+    #[error("underlying serde_json error: {0}")]
+    Json(#[from] serde_json::Error),
     #[error("underlying sqlx/postgres error: {0}")]
     Sqlx(#[from] sqlx::Error),
     #[error("database migration error: {0}")]
     Migration(#[from] sqlx::migrate::MigrateError),
+    #[error("no lock exists")]
+    NotExists,
 }
 
 #[derive(Error, Debug)]

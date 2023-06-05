@@ -46,7 +46,7 @@ pub trait LockClient: Send + Sync {
     // the original implementation of this was returning the top lock in the system, since our lock
     // is unique based on data, we require that same piece of data in order to return the current lock
     // again though, this is just lock information - it does not mean you're safe to act on the lock
-    async fn get_lock<T: Serialize + Send>(
+    async fn get_lock<T: Serialize + Send + Copy>(
         &self,
         data: T,
     ) -> Result<Option<LockItem<T>>, LockedObjectStoreError>;
@@ -54,14 +54,14 @@ pub trait LockClient: Send + Sync {
     /// Update data in the upstream lock of the current user still has it.
     /// The returned lock will have a new `rvn` so it'll increase the lease duration
     /// as this method is usually called when the work with a lock is extended.
-    async fn update_data<T: Serialize>(
+    async fn update_data<T: Serialize + Sync + Send + Copy>(
         &self,
         lock: &LockItem<T>,
     ) -> Result<LockItem<T>, LockedObjectStoreError>;
 
     /// Releases the given lock if the current user still has it, returning true if the lock was
     /// successfully released, and false if someone else already stole the lock
-    async fn release_lock<T: Serialize>(
+    async fn release_lock<T: Serialize + Sync + Send + Copy>(
         &self,
         lock: &LockItem<T>,
     ) -> Result<bool, LockedObjectStoreError>;
