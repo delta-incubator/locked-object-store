@@ -1,6 +1,8 @@
 //! Simple lock initially backed by PostgreSQL.
 mod errors;
 
+#[cfg(feature = "dynamodb")]
+pub mod dynamodb;
 #[cfg(feature = "postgres")]
 pub mod postgres;
 
