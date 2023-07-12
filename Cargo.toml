@@ -13,8 +13,12 @@ tokio = { version = "^1.25.0", default-features = false}
 serde = { version = "1", features = [ "derive" ]}
 
 # dynamodb feature
-#dynamodb_lock = { version = "^0.5.0", optional = true }
-dynamodb_lock = { git = "https://github.com/delta-incubator/dynamodb-lock-rs", branch = "web-identity", optional = true }
+rusoto_core = { version = "0.47", default-features = false, optional = true }
+rusoto_credential = { version = "0.47", default-features = false, optional = true}
+rusoto_dynamodb = { version = "0.47", default-features = false, optional = true }
+rusoto_sts = { version ="0.47", default-features = false, optional = true }
+maplit = { version = "1", optional = true }
+uuid = { version = "1.2", features = ["serde", "v4"], optional = true }
 
 # postres feature
 sqlx = {version = "^0.6.3", default-features = false, optional = true }
@@ -23,8 +27,13 @@ sqlx = {version = "^0.6.3", default-features = false, optional = true }
 object_store = { version = "^0.5.0", features = ["aws"]}
 
 [features]
-default = []
-dynamodb = ["dynamodb_lock"]
+default = ["rustls"]
+dynamodb = [
+    "maplit",
+    "rusoto_core",
+    "rusoto_dynamodb",
+    "uuid",
+]
 postgres = ["sqlx/postgres"]
 tokio-native-tls = ["sqlx/runtime-tokio-native-tls"]
 tokio-rustls = ["sqlx/runtime-tokio-rustls"]
@@ -32,3 +41,7 @@ actix-native-tls = ["sqlx/runtime-actix-native-tls"]
 actix-rustls = ["sqlx/runtime-actix-rustls"]
 async-std-native-tls = ["sqlx/runtime-async-std-native-tls"]
 async-std-rustls = ["sqlx/runtime-async-std-rustls"]
+native-tls = ["rusoto_core/native-tls", "rusoto_dynamodb/native-tls"]
+rustls = ["rusoto_core/rustls", "rusoto_dynamodb/rustls"]
+sts = ["rusoto_sts",
+        "rusoto_credential"]
