@@ -2,6 +2,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum LockedObjectStoreError {
+    /// Error propogated from the underlying lock provider
+    #[error("Internal lock provider error: {0}")]
+    LockProviderError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
+
     /// Error returned by `acquire_lock` which indicates that the lock could
     /// not be acquired for more that returned number of seconds.
     #[error("Could not acquire lock for {0} sec")]
