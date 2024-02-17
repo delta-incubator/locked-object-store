@@ -1,6 +1,5 @@
-/*
- * This module defines the DynamoDB backed object_store
- */
+//!
+//! This module defines the DynamoDB backed object_store
 
 use dynamodb_lock::DynamoDbLockClient;
 pub use dynamodb_lock::DynamoDbOptions;
